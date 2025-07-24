@@ -10,30 +10,29 @@ canvas.height = canvasHeight;
 
 let blocks = [];
 let birds = [
-  { x: 60, y: 560, w: 40, h: 40, color: "red", speed: 12, damage: 1 },
-  { x: 120, y: 540, w: 60, h: 60, color: "green", speed: 9, damage: 2 },
-  { x: 200, y: 520, w: 80, h: 80, color: "blue", speed: 7, damage: 3 },
+  { x: 60, y: 560, w: 40, h: 40, color: "red", speed: 0.07, damage: 1 },
+  { x: 120, y: 540, w: 60, h: 60, color: "green", speed: 0.05, damage: 2 },
+  { x: 200, y: 520, w: 80, h: 80, color: "blue", speed: 0.03, damage: 3 },
 ];
 let selectedBird = null;
 let dragging = false;
-let dragOffset = { x: 0, y: 0 };
 let launchedBird = null;
 let shotsLeft = 5;
 let score = 0;
 let gameActive = false;
 let gameEnded = false;
-let gameEndTimeout = null;
 let draggingTrajectory = false;
-let trajectoryStart = { x: 0, y: 0 };
-let trajectoryEnd = { x: 0, y: 0 };
-
-const boardX = 200;
-const boardY = 400;
+let tx = 0;
+let ty = 0;
+let gravity = 0.25;
+let launchedBlocksHit = 0;
+let boardX = 200;
+let boardY = 400;
 
 const birdMaxBlocks = {
-  red: 5,
-  green: 10,
-  blue: 15,
+  red: 3,
+  green: 7,
+  blue: 10,
 };
 
 function resetBirds() {
@@ -65,7 +64,6 @@ class Block {
 }
 
 function setupBlocks() {
-  blocks = [];
   for (let i = 120; i < 480; i += 40) {
     blocks.push(new Block(760, i, 60, 38, "orange", 3));
     blocks.push(new Block(830, i, 60, 38, "orange", 3));
@@ -181,7 +179,7 @@ function drawTrajectoryLine() {
     context.setLineDash([6, 6]);
     context.beginPath();
     context.moveTo(bx, by);
-    context.lineTo(trajectoryEnd.x, trajectoryEnd.y);
+    context.lineTo(tx, ty);
     context.stroke();
     context.setLineDash([]);
     context.restore();
@@ -193,7 +191,7 @@ function drawAll() {
   context.fillStyle = "lightgreen";
   context.fillRect(0, 0, canvas.width, canvas.height);
   blocks.forEach((block) => block.draw(context));
-  birds.forEach((b, i) => {
+  birds.forEach((b) => {
     let bird = new Bird(b.x, b.y, b.w, b.h, b.color);
     bird.draw(context);
   });
@@ -212,14 +210,13 @@ function drawAll() {
   drawScoreAndShots();
 }
 
-function isPointInBird(mx, my, bird) {
-  return (
-    mx >= bird.x &&
-    mx <= bird.x + bird.w &&
-    my >= bird.y &&
-    my <= bird.y + bird.h
-  );
+function getBirdMaxBlocks(bird) {
+  if (bird.color === "red") return birdMaxBlocks.red;
+  if (bird.color === "green") return birdMaxBlocks.green;
+  if (bird.color === "blue") return birdMaxBlocks.blue;
+  return 5;
 }
+
 
 
 canvas.addEventListener("click", function (e) {
@@ -250,10 +247,8 @@ canvas.addEventListener("mousedown", function (e) {
   if (mx >= b.x && mx <= b.x + b.w && my >= b.y && my <= b.y + b.h) {
     dragging = true;
     draggingTrajectory = true;
-    dragOffset.x = mx - (b.x + b.w / 2);
-    dragOffset.y = my - (b.y + b.h / 2);
-    trajectoryEnd.x = 760;
-    trajectoryEnd.y = boardY;
+    tx = 760;
+    ty = boardY;
   }
 });
 
@@ -269,9 +264,8 @@ canvas.addEventListener("mousemove", function (e) {
     let angle = Math.atan2(my - by, mx - bx);
     let dx = 760 - bx;
     let dy = Math.tan(angle) * dx;
-    let ty = Math.max(0, Math.min(by + dy, canvas.height));
-    trajectoryEnd.x = 760;
-    trajectoryEnd.y = ty;
+    ty = Math.max(0, Math.min(by + dy, canvas.height));
+    tx = 760;
     drawAll();
   }
 });
@@ -282,10 +276,8 @@ canvas.addEventListener("mouseup", function (e) {
     let b = birds[selectedBird];
     let bx = b.x + b.w / 2;
     let by = b.y + b.h / 2;
-    let tx = trajectoryEnd.x;
-    let ty = trajectoryEnd.y;
-    let dx = (tx - bx) / b.speed;
-    let dy = (ty - by) / b.speed;
+    let dx = (tx - bx) * b.speed;
+    let dy = (ty - by) * b.speed;
     launchedBird = {
       x: b.x,
       y: b.y,
@@ -308,15 +300,7 @@ canvas.addEventListener("mouseup", function (e) {
   }
 });
 
-let gravity = 0.5;
-let launchedBlocksHit = 0;
 
-function getBirdMaxBlocks(bird) {
-  if (bird.color === "red") return birdMaxBlocks.red;
-  if (bird.color === "green") return birdMaxBlocks.green;
-  if (bird.color === "blue") return birdMaxBlocks.blue;
-  return 5;
-}
 
 function update() {
   if (gameActive && launchedBird) {
